@@ -225,15 +225,15 @@ sample_dates <- function(sites, site_id_col = "Sitio", area_col = "Area",
   return(do.call(rbind, output))
 }
 
+### run examples 
 # terminus indicates the start year of the last phase. If a site did not get to it then its last area would be forced to be 0
-t1 <- sample_dates(test, terminus = 510)
-t2 <- sample_dates(test, start_method = 'exp', end_method = 'exp', perc = 0.1, terminus = 510)
+# t1 <- sample_dates(test, terminus = 510)
+# t2 <- sample_dates(test, start_method = 'exp', end_method = 'exp', perc = 0.1, terminus = 510)
+# ts2 <- t2[t2$id == 200,]
 
-ts2 <- t2[t2$id == 200,]
-
+#### Growth rate ---- 
 # G = (P2 - P1) / (t2 - t1)
 # we need to calculate the slope of the line connecting the two year estimates
-
 growth_rate <- function(sampled_df) {
   
   required <- c("id", "year", "area")
@@ -302,89 +302,7 @@ run_mc <- function(sites, iterations = 1000,
   return(all_results)
 }
   
-tmc1 <- run_mc(tsite, terminus = 510)
-
-
-ggplot(data = tmc1) +
-  geom_boxplot(aes(x = factor(-start), y = growth_cagr)) +
-  scale_y_log10()
-  # geom_line(aes(x = year, y = area, group = iteration)) 
-
-# Plot CAGR with 95% confidence intervals
-plot(summary_stats$mean_year, summary_stats$median_cagr,
-     type = "b", pch = 16, col = "blue",
-     ylim = range(c(summary_stats$q025_cagr, summary_stats$q975_cagr), na.rm = TRUE),
-     xlab = "Year (BP)", ylab = "CAGR",
-     main = paste("Growth Rate for Site", tsite$Sitio[1]))
-
-# Add confidence interval polygon
-polygon(
-  c(summary_stats$mean_year, rev(summary_stats$mean_year)),
-  c(summary_stats$q025_cagr, rev(summary_stats$q975_cagr)),
-  col = rgb(0, 0, 1, 0.2), border = NA
-)
-
-# Add mean line
-lines(summary_stats$mean_year, summary_stats$mean_cagr, 
-      col = "darkblue", lwd = 2)
-
-# Add horizontal line at 0
-abline(h = 0, lty = 2, col = "gray50")
-
-legend("topright", 
-       legend = c("Median", "Mean", "95% CI"),
-       col = c("blue", "darkblue", rgb(0,0,1,0.2)),
-       lwd = c(1, 2, 10), pch = c(16, NA, 15))
-#### try exponential decay ----
-# 
-# ## plot all possible phase curves 
-# 
-# starts <- unique(test$start)*-1
-# ends   <- unique(test$end)*-1
-# 
-# percs <- c(1,5,10)
-# L <- c(0.1, 0.05, 0.01)
-# pals_1 <- c('lightblue', 'steelblue', 'darkblue')
-# pals_2 <- c('lightgreen', 'green2', 'darkgreen')
-# 
-# plot(
-#   NULL,
-#   xlim = range(c(starts, ends)),
-#   ylim = c(0, 0.02),
-#   xlab = "Year",
-#   ylab = "Density",
-#   main = "Start/end exponential distributions"
-# )
-# 
-# for(i in seq_along(starts)) {
-#   a <- starts[i]
-#   b <- ends[i]
-#   
-#   t <- seq(a, b, length.out = 500)
-#   
-#   for(i in seq_along(percs)) {
-#     
-#     # L <- 1 / ((b - a) / percs[i])
-#     
-#     d <- exp(-L[i] * (t - a))
-#     d <- d / sum(d)
-#     
-#     lines(t, d, col = pals_1[i], lwd = 2)
-#     # now ends
-#     d <- exp(-L[i] * (b - t))
-#     d <- d / sum(d)
-#     
-#     lines(t, d, col = pals_2[i], lwd = 2)
-#   }
-#   
-#   
-# }
-# 
-# abline(v = c(starts, ends[length(ends)]), lty = 3)
-# 
-# legend(
-#   x = 'topleft',
-#   title = 'Percentage ranges',
-#   lty = 1, col = c('grey75', 'grey30', 'black'),
-#   lwd = 2, legend = paste0(percs, '%')
-# )
+## run examples 
+# tmc1 <- run_mc(test[test$Sitio %in% c(160,200),], terminus = 510, iterations = 1000)
+# tmc2 <- run_mc(test[test$Sitio %in% c(160,200),], terminus = 510, iterations = 1000,
+#                start_method = 'exp', end_method = 'exp', peak_method = 'norm')
