@@ -1,3 +1,8 @@
+### Main function script ----
+# load helper functions
+source(file.path('scripts', 'helpers_sampling.R'))
+
+## Rule-based sampling of calendar dates
 sample_dates <- function(sites, site_id_col = "Sitio", area_col = "Area",
                          start_method = 'unif', end_method = 'unif', peak_method = 'unif',
                          peak_sd_perc = .1, perc = 5, terminus = 1) {
@@ -231,7 +236,7 @@ sample_dates <- function(sites, site_id_col = "Sitio", area_col = "Area",
 # t2 <- sample_dates(test, start_method = 'exp', end_method = 'exp', perc = 0.1, terminus = 510)
 # ts2 <- t2[t2$id == 200,]
 
-#### Growth rate ---- 
+#### Growth rate function ---- 
 # G = (P2 - P1) / (t2 - t1)
 # we need to calculate the slope of the line connecting the two year estimates
 growth_rate <- function(sampled_df) {

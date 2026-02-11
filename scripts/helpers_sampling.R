@@ -21,7 +21,7 @@ exp_sampling <- function(start, end, perc) {
 
 norm_peak <- function(start, end, peak_sd_perc) {
   
-  if (start <= end) stop("Start must be older than end (years BP).")
+  if (start < end) stop("Start must be older than end (years BP).")
   if(peak_sd_perc < 0) stop("The peak_sd_perc you chose is invalid! It must be > 0.")
   if(peak_sd_perc > 1) warning("The peak_sd_perc you chose is > 1. This will make your sd bigger than the phase interval.")
   
@@ -112,8 +112,36 @@ summary_site <- function(sites) {
       med_year   = median(bcad_to_bp(year, bc_to_bp = FALSE)),
       q025_year  = quantile(year, 0.025),
       q975_year  = quantile(year, 0.975),
-      area       = mean(area) # the val is repeated the mean = the actual value 
+      area       = max(area, na.rm = TRUE) # the val is repeated but sometimes 0.1 or 0 is given (start/end) take the MAX val
     )
+  return(tmp)
+  
+}
+
+## summary growth by period
+summary_period <- function(sites) {
+  
+  tmp <- sites |>
+    group_by(start, end) |>
+    summarise(
+      median     = median(growth_cagr, na.rm = TRUE), # na.rm necessary as summary is not by site
+      mean       = mean(growth_cagr, na.rm = TRUE), # na.rm necessary as summary is not by site
+      q025       = quantile(growth_cagr, 0.025, na.rm = TRUE),   
+      q975       = quantile(growth_cagr, 0.975, na.rm = TRUE),   
+      q25        = quantile(growth_cagr, 0.25, na.rm = TRUE),    
+      q75        = quantile(growth_cagr, 0.75, na.rm = TRUE),    
+      iqr        = IQR(growth_cagr, na.rm = TRUE), # Interquartile range
+      # Linear growth
+      med_lin    = median(growth_linear, na.rm = TRUE),
+      q025_lin   = quantile(growth_linear, 0.025, na.rm = TRUE),
+      q975_lin   = quantile(growth_linear, 0.975, na.rm = TRUE),
+      # Year
+      med_year   = median(bcad_to_bp(year, bc_to_bp = FALSE)),
+      q025_year  = quantile(year, 0.025),
+      q975_year  = quantile(year, 0.975),
+      area       = sum(area) # overall area by period 
+    )
+  
   return(tmp)
   
 }
@@ -122,7 +150,7 @@ summary_site <- function(sites) {
 # a good function to create your own palettes with greyscale
 # scales::alpha("steelblue", 0.2)
 plot_site_cagr <- function(site, legend = TRUE, 
-                           col_med = 'steelblue', col_mean = 'skyblue',
+                           col_med = 'steelblue', col_mean = 'skyblue', ID = TRUE,
                            col_0 = 'grey10', col_95 = '#4682B433', col_50 = '#4682B44C') {
   
   required_cols <- c("median", "med_year", "q025", "q975", "q25", "q75")
@@ -134,12 +162,23 @@ plot_site_cagr <- function(site, legend = TRUE,
   x_lim <- c(bcad_to_bp(max(site$start, na.rm = TRUE), bc_to_bp = FALSE),
              bcad_to_bp(min(site$end, na.rm = TRUE), bc_to_bp = FALSE))
   # Plot CAGR with SD
-  plot(site$med_year, site$median,
-       type = "b", pch = 16, col = NA,
-       ylim = range(c(site$q025[-nrow(site)], site$q975[-nrow(site)]), na.rm = TRUE),
-       xlim = x_lim,
-       xlab = "Year (BC/AD)", ylab = "CAGR",
-       main = paste("Growth Rate for Site", site$id[1]))
+  if(ID == TRUE) {
+    plot(site$med_year, site$median,
+         type = "b", pch = 16, col = NA,
+         ylim = range(c(site$q025[-nrow(site)], site$q975[-nrow(site)]), na.rm = TRUE),
+         xlim = x_lim,
+         xlab = "Year (BC/AD)", ylab = "CAGR",
+         main = paste0("Growth Rate for Site ", site$id[1])) 
+  } else if(ID == FALSE) {
+    plot(site$med_year, site$median,
+         type = "b", pch = 16, col = NA,
+         ylim = range(c(site$q025[-nrow(site)], site$q975[-nrow(site)]), na.rm = TRUE),
+         xlim = x_lim,
+         xlab = "Year (BC/AD)", ylab = "CAGR",
+         main = "Growth Rate" )
+  } else {
+    stop("TRUE or FALSE expected for ID.")
+  }
   
   # Add confidence interval polygon
   polygon(
@@ -196,7 +235,7 @@ plot_spaghetti <- function(site, summary_data, iter_num = 50, seed = 1234, type 
   cap_type <- strsplit(type, "_")[[1]][1]
   plot(NULL, xlim = x_lim, ylim = y_lim, xlab = "Year", 
        ylab = type, 
-       main = paste0("Individual ", cap_type, " trajectories (", iter_num, " samples)")
+       main = paste0("Site ", unique(site$id), " ", cap_type, " trajectories (", iter_num, " samples)")
   )
   
   for(iter in sample_iterations) {
@@ -222,3 +261,54 @@ plot_spaghetti <- function(site, summary_data, iter_num = 50, seed = 1234, type 
   abline(v = bcad_to_bp(summary_data$start, bc_to_bp = FALSE), lty = 2, lwd =.75)
   
 } 
+
+#### Persistence ----
+mc_persistence <- function(sites, terminus = 431) {
+  
+  tmp <- sites[sites$start > terminus,]
+  
+  tmp <- tmp |>
+    group_by(id, iteration) |>
+    summarise(
+      available_pers = max(year, na.rm = TRUE) - terminus,
+      persistence    = ifelse(
+        min(end, na.rm = TRUE) == terminus, available_pers,
+        max(year, na.rm = TRUE) - min(year, na.rm = TRUE)),
+      norm_pers      =  persistence / available_pers,
+      start          = max(year, na.rm = TRUE),
+      end            = ifelse(
+        norm_pers == 1, terminus, min(year, na.rm = TRUE)),
+      .groups = "drop"
+    ) 
+  # force persistence to be at least 1 year
+  tmp$persistence[tmp$persistence == 0] <- 1
+  return(tmp)
+
+  }
+
+persistence <- function(sites, terminus = 431) {
+  
+  tmp <- mc_persistence(sites, terminus = terminus) |>
+    group_by(id) |>
+    summarise(
+      mean   = mean(persistence, na.rm = TRUE),
+      median = median(persistence, na.rm = TRUE),
+      q025   = quantile(persistence, 0.025, na.rm = TRUE),
+      q975   = quantile(persistence, 0.975, na.rm = TRUE),
+      q25    = quantile(persistence, 0.25, na.rm = TRUE),
+      q75    = quantile(persistence, 0.75, na.rm = TRUE),
+      # normalised
+      mean_n   = mean(norm_pers, na.rm = TRUE),
+      median_n = median(norm_pers, na.rm = TRUE),
+      q025_n   = quantile(norm_pers, 0.025, na.rm = TRUE),
+      q975_n   = quantile(norm_pers, 0.975, na.rm = TRUE),
+      q25_n    = quantile(norm_pers, 0.25, na.rm = TRUE),
+      q75_n    = quantile(norm_pers, 0.75, na.rm = TRUE),
+      # years (for plotting)
+      start = median(start, na.rm = TRUE),
+      end   = median(end, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  return(tmp)
+}
